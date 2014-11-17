@@ -27,6 +27,8 @@ router_test_() ->
   Tests = [
     {"GET", "foo.com", "/anyhost",
      {ok, any_host_resource, [], [], [<<"com">>, <<"foo">>], [<<"anyhost">>]}},
+    {"GET", "foo.com", "///////anyhost//////",
+     {ok, any_host_resource, [], [], [<<"com">>, <<"foo">>], [<<"anyhost">>]}},
     {"GET", "foo.com", "/anyhost1",
      {error, notfound}},
     {"GET", "example.com", "/users",

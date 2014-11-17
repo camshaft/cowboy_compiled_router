@@ -29,6 +29,8 @@ match(Method, Host, <<"/", Path/binary>>) ->
 match(_, _, _) ->
   {error, badrequest}.
 
+split_path(<<"/", Path/binary>>, Acc) ->
+  split_path(Path, Acc);
 split_path(Path, Acc) ->
   try
     case binary:match(Path, <<"/">>) of
