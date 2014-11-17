@@ -1,11 +1,22 @@
 -module(template).
 
--export([execute/2,match/3]).
+-export([execute/2,match/3,resolve/1,resolve/2]).
 
 match_parts(_, _, badpath) ->
   {error, badrequest};
 match_parts(_, _, _) ->
   {error, notfound}.
+
+resolve(Module, Map) ->
+  resolve_error(Module, Map, notfound).
+
+resolve(Module) ->
+  resolve(Module, #{}).
+
+resolve_error(_Module, Map, Expected) when is_list(Expected) ->
+  {error, {missing_args, [A || A <- Expected, not maps:is_key(A, Map)]}};
+resolve_error(_Module, _Map, Error) ->
+  {error, Error}.
 
 execute(Req, Env) ->
   [Method, Host, Path] = cowboy_req:get([method, host, path], Req),

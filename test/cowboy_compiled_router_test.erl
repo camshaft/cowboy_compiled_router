@@ -23,7 +23,7 @@
 -host("[:optionaldomain].other.com").
   -get({"/", other_domain}).
 
-router_test_() ->
+match_test_() ->
   Tests = [
     {"GET", "foo.com", "/anyhost",
      {ok, any_host_resource, [], [], [<<"com">>, <<"foo">>], [<<"anyhost">>]}},
@@ -53,3 +53,20 @@ router_test_() ->
   [{Method ++ " " ++ Host ++ Path, fun() ->
     ?assertEqual(Out, match(list_to_binary(Method), list_to_binary(Host), list_to_binary(Path)))
   end} || {Method, Host, Path, Out} <- Tests].
+
+resolve_test_() ->
+  Tests = [
+    {users_resource, [],
+      {ok, <<"GET">>,[<<"com">>, <<"example">>],[<<"users">>]}},
+    {user_resource, [<<"123">>],
+      {ok, <<"GET">>,[<<"com">>, <<"example">>],[<<"users">>, <<"123">>]}},
+    {user_resource, #{user => <<"123">>},
+      {ok, <<"GET">>,[<<"com">>, <<"example">>],[<<"users">>, <<"123">>]}},
+    {user_resource, #{other => <<"123">>},
+      {error, {missing_args,[user]}}},
+    {catchall_resource, [],
+      {ok, '_', [<<"co">>, <<"example">>, '...'], [<<"catchall">>]}}
+  ],
+  [{lists:flatten(io_lib:format("~p ~p", [Module, Args])), fun() ->
+    ?assertEqual(Out, resolve(Module, Args))
+  end} || {Module, Args, Out} <- Tests].
