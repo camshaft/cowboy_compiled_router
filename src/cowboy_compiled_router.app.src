@@ -1,0 +1,12 @@
+{application, cowboy_compiled_router, [
+  {description, "compiled router for cowboy"},
+  {vsn, "0.1.0"},
+  {modules, []},
+  {registered, []},
+  {applications, [
+    kernel,
+    stdlib
+  ]},
+  {mod, {cowboy_compiled_router_app, []}},
+  {env, []}
+]}.
