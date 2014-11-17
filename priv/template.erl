@@ -9,7 +9,7 @@ match_parts(_, _, _) ->
 
 execute(Req, Env) ->
   [Method, Host, Path] = cowboy_req:get([method, host, path], Req),
-  case match_parts(Method, Host, Path) of
+  case match(Method, Host, Path) of
     {ok, Handler, HandlerOpts, Bindings, HostInfo, PathInfo} ->
       Req2 = cowboy_req:set_bindings(HostInfo, PathInfo, Bindings, Req),
       Env2 = [{handler, Handler}, {handler_opts, HandlerOpts}|Env],
