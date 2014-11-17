@@ -7,21 +7,21 @@
 -get({"/anyhost", any_host_resource}).
 
 -host("example.com").
--get({"/", root_resource}).
--get({"/users", users_resource, [{users, [<<"joe">>, <<"mike">>, <<"robert">>]}]}).
--post({"/users", create_users_resource, []}).
--get({"/users/:user", user_resource, []}).
+  -get({"/", root_resource}).
+  -get({"/users", users_resource, [{users, [<<"joe">>, <<"mike">>, <<"robert">>]}]}).
+  -post({"/users", create_users_resource, []}).
+  -get({"/users/:user", user_resource, []}).
 
 -host("[...].example.co").
--all({"/catchall", catchall_resource}).
--get({"/optional/[:args]", optional_args}).
+  -all({"/catchall", catchall_resource}).
+  -get({"/optional/[:args]", optional_args}).
 
 -host(":sub.example.com").
--get({"/", sub_root_resource}).
--get({"/home/[...]", rest_resource}).
+  -get({"/", sub_root_resource}).
+  -get({"/home/[...]", rest_resource}).
 
 -host("[:optionaldomain].other.com").
--get({"/", other_domain}).
+  -get({"/", other_domain}).
 
 router_test_() ->
   Tests = [
