@@ -164,8 +164,10 @@ to_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   to_clauses(Rest, [Clause|Acc]).
 
 get_action(Args, Default) ->
-  case fast_key:get(action, Args) of
+  case catch fast_key:get(action, Args) of
     undefined ->
+      Default;
+    {'EXIT', _} ->
       Default;
     A ->
       erl_parse:abstract(A)

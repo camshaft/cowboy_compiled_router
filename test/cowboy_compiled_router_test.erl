@@ -9,6 +9,8 @@
 -post({"/create", first_create_resource, [{action, first}]}).
 -post({"/create", second_create_resource, [{action, second}]}).
 
+-get({"/garbage", garbage, foo}).
+
 -host("example.com").
   -get({"/", root_resource}).
   -get({"/users", users_resource, [{users, [<<"joe">>, <<"mike">>, <<"robert">>]}]}).
