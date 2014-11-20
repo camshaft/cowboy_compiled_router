@@ -1,14 +1,18 @@
 -module(template).
 
--export([execute/2,match/3,resolve/1,resolve/2]).
+-export([execute/2,match/3,match/4,resolve/1,resolve/2]).
 
-match_parts(_, _, badpath) ->
+match_parts(_, _, badpath, _) ->
   {error, badrequest};
-match_parts(_, _, _) ->
+match_parts(_, _, _, _) ->
   {error, notfound}.
 
 resolve(Module, Map) ->
   resolve_error(Module, Map, notfound).
+
+%% default behavior
+extract_action(Req, Env) ->
+  {undefined, Req, Env}.
 
 resolve(Module) ->
   resolve(Module, #{}).
@@ -20,24 +24,28 @@ resolve_error(_Module, _Map, Error) ->
 
 execute(Req, Env) ->
   [Method, Host, Path] = cowboy_req:get([method, host, path], Req),
-  case match(Method, Host, Path) of
+  {Action, Req2, Env2} = extract_action(Req, Env),
+  case match(Method, Host, Path, Action) of
     {ok, Handler, HandlerOpts, Bindings, HostInfo, PathInfo} ->
-      Req2 = cowboy_req:set_bindings(HostInfo, PathInfo, Bindings, Req),
-      Env2 = [{handler, Handler}, {handler_opts, HandlerOpts}|Env],
-      {ok, Req2, Env2};
+      Req3 = cowboy_req:set_bindings(HostInfo, PathInfo, Bindings, Req2),
+      Env3 = [{handler, Handler}, {handler_opts, HandlerOpts}|Env2],
+      {ok, Req3, Env3};
     {error, notfound} ->
-      {error, 404, Req};
+      {error, 404, Req2};
     {error, badrequest} ->
-      {error, 400, Req}
+      {error, 400, Req2}
   end.
 
-match(Method, Host, <<>>) ->
-  match_parts(Method, split_host(Host, []), []);
-match(Method, Host, <<"/">>) ->
-  match_parts(Method, split_host(Host, []), []);
-match(Method, Host, <<"/", Path/binary>>) ->
-  match_parts(Method, split_host(Host, []), split_path(Path, []));
-match(_, _, _) ->
+match(Method, Host, Path) ->
+  match(Method, Host, Path, undefined).
+
+match(Method, Host, <<>>, Action) ->
+  match_parts(Method, split_host(Host, []), [], Action);
+match(Method, Host, <<"/">>, Action) ->
+  match_parts(Method, split_host(Host, []), [], Action);
+match(Method, Host, <<"/", Path/binary>>, Action) ->
+  match_parts(Method, split_host(Host, []), split_path(Path, []), Action);
+match(_, _, _, _) ->
   {error, badrequest}.
 
 split_path(<<"/", Path/binary>>, Acc) ->

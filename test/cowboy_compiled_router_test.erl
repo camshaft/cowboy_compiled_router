@@ -6,6 +6,9 @@
 
 -get({"/anyhost", any_host_resource}).
 
+-post({"/create", first_create_resource, [{action, first}]}).
+-post({"/create", second_create_resource, [{action, second}]}).
+
 -host("example.com").
   -get({"/", root_resource}).
   -get({"/users", users_resource, [{users, [<<"joe">>, <<"mike">>, <<"robert">>]}]}).
@@ -23,12 +26,19 @@
 -host("[:optionaldomain].other.com").
   -get({"/", other_domain}).
 
+extract_action(Req, Env) ->
+  {foo, Req, Env}.
+
 match_test_() ->
   Tests = [
     {"GET", "foo.com", "/anyhost",
      {ok, any_host_resource, [], [], [<<"com">>, <<"foo">>], [<<"anyhost">>]}},
     {"GET", "foo.com", "///////anyhost//////",
      {ok, any_host_resource, [], [], [<<"com">>, <<"foo">>], [<<"anyhost">>]}},
+    {"POST", "localhost", "/create", first,
+     {ok, first_create_resource, [{action,first}], [], [<<"localhost">>], [<<"create">>]}},
+    {"POST", "localhost", "/create", second,
+     {ok, second_create_resource, [{action,second}], [], [<<"localhost">>], [<<"create">>]}},
     {"GET", "foo.com", "/anyhost1",
      {error, notfound}},
     {"GET", "example.com", "/users",
@@ -50,9 +60,14 @@ match_test_() ->
     {"GET", "bar.other.com", "/",
      {ok, other_domain, [], [{optionaldomain,<<"bar">>}], [<<"com">>, <<"other">>, <<"bar">>], []}}
   ],
-  [{Method ++ " " ++ Host ++ Path, fun() ->
-    ?assertEqual(Out, match(list_to_binary(Method), list_to_binary(Host), list_to_binary(Path)))
-  end} || {Method, Host, Path, Out} <- Tests].
+  [{element(1,Test) ++ " " ++ element(2,Test) ++ element(3,Test), fun() ->
+    case Test of
+      {Method, Host, Path, Out} ->
+        ?assertEqual(Out, match(list_to_binary(Method), list_to_binary(Host), list_to_binary(Path)));
+      {Method, Host, Path, Action, Out} ->
+        ?assertEqual(Out, match(list_to_binary(Method), list_to_binary(Host), list_to_binary(Path), Action))
+    end
+  end} || Test <- Tests].
 
 resolve_test_() ->
   Tests = [

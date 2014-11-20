@@ -8,11 +8,15 @@ parse_transform(Forms, _Options) ->
   {ok, Compiled} = compile(Patterns),
   {ok, Clauses} = to_clauses(Compiled, []),
   {ok, Resolved} = to_resolve_clauses(Compiled, []),
-  [_, Exports, MatchParts, Resolve|FunsRest] = template(),
+  [_, Exports, MatchParts, Resolve, DefaultExtractAction|FunsRest] = template(),
+  ExtractAction = case lists:keyfind(extract_action,3,Forms2) of
+    false -> [DefaultExtractAction];
+    _ -> []
+  end,
   MergedMatches = add_clauses(Clauses, MatchParts),
   MergedResolve = add_clauses(Resolved, Resolve),
   [EOF|Forms3] = lists:reverse(Forms2),
-  Forms4 = [File, Module, Exports] ++ lists:reverse(Forms3) ++ [MergedMatches, MergedResolve] ++ FunsRest ++ [EOF],
+  Forms4 = [File, Module, Exports] ++ lists:reverse(Forms3) ++ [MergedMatches, MergedResolve] ++ ExtractAction ++ FunsRest ++ [EOF],
   Forms4.
 
 extract_patterns([], Patterns, Forms, _Host) ->
@@ -64,6 +68,7 @@ to_resolve_clauses([{Method, Host, Path, Module, _Args, Line}|Rest], Acc) ->
   end,
   Fields = to_fields(Host, Path, Line),
   Res = [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line)]}],
+
   MapClause = {
     clause,Line,
     [{atom,Line,Module},
@@ -71,6 +76,7 @@ to_resolve_clauses([{Method, Host, Path, Module, _Args, Line}|Rest], Acc) ->
     [],
     Res
   },
+
   ListClause = {
     clause,Line,
     [{atom,Line,Module},
@@ -78,6 +84,7 @@ to_resolve_clauses([{Method, Host, Path, Module, _Args, Line}|Rest], Acc) ->
     [],
     Res
   },
+
   case length(Fields) of
     0 ->
       to_resolve_clauses(Rest, [MapClause,ListClause|Acc]);
@@ -131,13 +138,21 @@ to_fields_list([_|Rest], Line) ->
 to_clauses([], Acc) ->
   {ok, lists:reverse(Acc)};
 to_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
+  Action = case fast_key:get(action, Args) of
+    undefined ->
+      {var,Line,'_'};
+    A ->
+      erl_parse:abstract(A)
+  end,
+
   HostPattern = to_binding(Host, Line),
   PathPattern = to_binding(Path, Line),
   Clause = {
    clause,Line,
     [to_method(Method, Line),
      {match,Line,HostPattern,{var,Line,'__HostInfo'}},
-     {match,Line,PathPattern,{var,Line,'__PathInfo'}}],
+     {match,Line,PathPattern,{var,Line,'__PathInfo'}},
+     Action],
     [],
     [{tuple,Line,[{atom,Line,ok},
                   {atom,Line,Module},
