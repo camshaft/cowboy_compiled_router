@@ -79,6 +79,10 @@ resolve_test_() ->
       {ok, <<"GET">>,[<<"com">>, <<"example">>],[<<"users">>, <<"123">>]}},
     {user_resource, #{other => <<"123">>},
       {error, {missing_args,[user]}}},
+    {first_create_resource, [],
+      {ok, <<"POST">>, '_', [<<"create">>], first}},
+    {second_create_resource, [],
+      {ok, <<"POST">>, '_', [<<"create">>], second}},
     {catchall_resource, [],
       {ok, '_', [<<"co">>, <<"example">>, '...'], [<<"catchall">>]}}
   ],

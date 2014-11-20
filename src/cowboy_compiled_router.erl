@@ -61,13 +61,19 @@ compile_path({Method, Host, {Path, Module, Args}, Line}) ->
 
 to_resolve_clauses([], Acc) ->
   {ok, lists:reverse(Acc)};
-to_resolve_clauses([{Method, Host, Path, Module, _Args, Line}|Rest], Acc) ->
+to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   ResolvedMethod = case Method of
     '_' -> {atom,Line,'_'};
      _ -> to_bin(Method, Line)
   end,
   Fields = to_fields(Host, Path, Line),
-  Res = [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line)]}],
+  Action = get_action(Args, {atom,Line,undefined}),
+  Res = case get_action(Args, false) of
+    false ->
+      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line)]}];
+    Action ->
+      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line),Action]}]
+  end,
 
   MapClause = {
     clause,Line,
@@ -138,13 +144,7 @@ to_fields_list([_|Rest], Line) ->
 to_clauses([], Acc) ->
   {ok, lists:reverse(Acc)};
 to_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
-  Action = case fast_key:get(action, Args) of
-    undefined ->
-      {var,Line,'_'};
-    A ->
-      erl_parse:abstract(A)
-  end,
-
+  Action = get_action(Args, {var,Line,'_'}),
   HostPattern = to_binding(Host, Line),
   PathPattern = to_binding(Path, Line),
   Clause = {
@@ -162,6 +162,14 @@ to_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
                   {var,Line,'__PathInfo'}]}]
   },
   to_clauses(Rest, [Clause|Acc]).
+
+get_action(Args, Default) ->
+  case fast_key:get(action, Args) of
+    undefined ->
+      Default;
+    A ->
+      erl_parse:abstract(A)
+  end.
 
 add_clauses(Clauses, Fun) ->
   Default = element(5, Fun),
