@@ -60,11 +60,10 @@ compile_path({Method, Host, {Path, Module, Args}, Line}) ->
   end, [], cowboy_compiled_router_parser:parse(Routes)).
 
 to_resolve_clauses([], Clauses) ->
-  Filtered = lists:foldl(fun(Clause = {clause, _, [{atom,_,Module}|_], _, _}, Acc) ->
-    lists:keystore(Module, 1, Acc, {Module, Clause})
+  Filtered = lists:foldl(fun({ID, Clause}, Acc) ->
+    lists:keystore(ID, 1, Acc, {ID, Clause})
   end, [], Clauses),
-  {ok, [Clause || {_, Clause} <- Filtered]};
-
+  {ok, [Clause || {_, Clause} <- lists:reverse(Filtered)]};
 to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   ResolvedMethod = case Method of
     '_' -> {atom,Line,'_'};
@@ -74,46 +73,48 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   Action = get_action(Args, {atom,Line,undefined}),
   Res = case get_action(Args, false) of
     false ->
-      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line)]}];
+      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, '__HostInfo', Line),resolve_binding(Path, '__PathInfo', Line)]}];
     Action ->
-      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, Line),resolve_binding(Path, Line),Action]}]
+      [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, '__HostInfo', Line),resolve_binding(Path, '__PathInfo', Line),Action]}]
   end,
 
-  MapClause = {
+  ID = erlang:phash2([Module, Args]),
+
+  MapClause = {erlang:phash2([ID, map]), {
     clause,Line,
     [{atom,Line,Module},
      {map,Line,Fields}],
     [],
     Res
-  },
+  }},
 
-  ListClause = {
+  ListClause = {erlang:phash2([ID, list]), {
     clause,Line,
     [{atom,Line,Module},
      to_fields_list(Host, Path, Line)],
     [],
     Res
-  },
+  }},
 
   case length(Fields) of
     0 ->
       to_resolve_clauses(Rest, [MapClause,ListClause|Acc]);
     _ ->
       ArgsList = to_args([Atom || Atom <- merge_lists(Host, Path), is_atom(Atom)], Line),
-      Secondary = {
+      Secondary = {erlang:phash2([ID, secondary]), {
         clause,Line,
         [{atom,Line,Module},
          {var,Line,'Params'}],
         [],
         [{call,Line,{atom,Line,resolve_error},[{atom,Line,Module},{var,Line,'Params'},ArgsList]}]
-       },
-      to_resolve_clauses(Rest, [Secondary,MapClause,ListClause|Acc])
+       }},
+      to_resolve_clauses(Rest, [Secondary, MapClause, ListClause|Acc])
   end.
 
-resolve_binding(Part, Line) ->
+resolve_binding(Part, Var, Line) ->
   case Part of
     '_' -> {atom,Line,'_'};
-     _ -> to_binding(Part, Line, atom)
+     _ -> to_binding(Part, Var, Line, atom)
   end.
 
 merge_lists('_', Path) ->
@@ -149,23 +150,33 @@ to_clauses([], Acc) ->
   {ok, lists:reverse(Acc)};
 to_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   Action = get_action(Args, {var,Line,'_'}),
-  HostPattern = to_binding(Host, Line),
-  PathPattern = to_binding(Path, Line),
+  HostPattern = to_binding(Host, '__HostInfo', Line),
+  PathPattern = to_binding(Path, '__PathInfo', Line),
   Clause = {
    clause,Line,
     [to_method(Method, Line),
-     {match,Line,HostPattern,{var,Line,'__HostInfo'}},
-     {match,Line,PathPattern,{var,Line,'__PathInfo'}},
+     HostPattern,
+     PathPattern,
      Action],
     [],
     [{tuple,Line,[{atom,Line,ok},
                   {atom,Line,Module},
                   to_args(Args,Line),
                   to_bindings(Host, Path, Line),
-                  {var,Line,'__HostInfo'},
-                  {var,Line,'__PathInfo'}]}]
+                  to_info_var(Host, '__HostInfo', Line),
+                  to_info_var(Path, '__PathInfo', Line)]}]
   },
   to_clauses(Rest, [Clause|Acc]).
+
+to_info_var(Tokens, Var, Line) when is_list(Tokens) ->
+  case lists:member('...', Tokens) of
+    true ->
+      {var, Line, Var};
+    _ ->
+      {nil, Line}
+  end;
+to_info_var(_, _, Line) ->
+  {nil, Line}.
 
 get_action(Args, Default) ->
   case catch fast_key:get(action, Args) of
@@ -203,25 +214,25 @@ to_method(Method, Line) when is_list(Method) ->
 to_args(Args, _Line) ->
   erl_parse:abstract(Args).
 
-to_binding(Parts, Line) ->
-  to_binding(Parts, Line, var).
+to_binding(Parts, InfoVar, Line) ->
+  to_binding(Parts, InfoVar, Line, var).
 
-to_binding('_', Line, var) ->
+to_binding('_', _, Line, var) ->
   {var,Line,'_'};
-to_binding('_', Line, atom) ->
+to_binding('_', _, Line, atom) ->
   {cons,Line,{atom,Line,'_'},{nil,Line}};
-to_binding([], Line, _) ->
+to_binding([], _, Line, _) ->
   {nil,Line};
-to_binding([Part|Rest], Line, Out) when is_binary(Part) ->
-  to_binding([binary_to_list(Part)|Rest], Line, Out);
-to_binding([Part|Rest], Line, Out) when is_list(Part) ->
-  {cons,Line,to_bin(Part,Line),to_binding(Rest, Line, Out)};
-to_binding(['...'|_], Line, var) ->
-  {var,Line,'_'};
-to_binding(['...'|Rest], Line, atom) ->
-  {cons,Line,{atom,Line,'...'},to_binding(Rest, Line, atom)};
-to_binding([Part|Rest], Line, Out) when is_atom(Part) ->
-  {cons,Line,{var,Line,Part},to_binding(Rest, Line, Out)}.
+to_binding([Part|Rest], InfoVar, Line, Out) when is_binary(Part) ->
+  to_binding([binary_to_list(Part)|Rest], InfoVar, Line, Out);
+to_binding([Part|Rest], InfoVar, Line, Out) when is_list(Part) ->
+  {cons,Line,to_bin(Part,Line),to_binding(Rest, InfoVar, Line, Out)};
+to_binding(['...'|_], InfoVar, Line, var) ->
+  {var,Line,InfoVar};
+to_binding(['...'|Rest], InfoVar, Line, atom) ->
+  {cons,Line,{atom,Line,'...'},to_binding(Rest, InfoVar, Line, atom)};
+to_binding([Part|Rest], InfoVar, Line, Out) when is_atom(Part) ->
+  {cons,Line,{var,Line,Part},to_binding(Rest, InfoVar, Line, Out)}.
 
 to_bin(Contents, Line) ->
   {bin,Line,[{bin_element,Line,{string,Line,Contents},default,default}]}.
