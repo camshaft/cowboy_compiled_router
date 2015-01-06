@@ -117,7 +117,7 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc, Seconda
 filter_bindings(Arg) when is_atom(Arg) ->
   [];
 filter_bindings(List) when is_list(List) ->
-  lists:sort([L || L <- List, is_atom(L)]).
+  lists:sort([L || L <- List, is_atom(L), L =/= '_', L =/= '...']).
 
 resolve_binding(Part, Var, Line) ->
   case Part of
