@@ -4,6 +4,8 @@
 
 -compile({parse_transform,cowboy_compiled_router}).
 
+-get({"/api/[...]", poe_router_handler, [{app, <<"api">>}]}).
+
 -get({"/anyhost", any_host_resource}).
 
 -post({"/create", first_create_resource, [{action, first}]}).
@@ -28,13 +30,12 @@
 -host("[:optionaldomain].other.com").
   -get({"/", other_domain}).
 
--get({"/api/[...]", poe_router_handler, [{app, <<"api">>}]}).
-
 -host("host1.com").
   -get({"/[...]", poe_router_handler, [{branch, <<"master">>}]}).
 
 -host("host2.com").
   -get({"/[...]", poe_router_handler, [{branch, <<"staging">>}]}).
+
 
 extract_action(Req, Env) ->
   {foo, Req, Env}.

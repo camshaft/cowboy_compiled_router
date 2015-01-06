@@ -115,7 +115,7 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc, Seconda
   end.
 
 filter_bindings(Arg) when is_atom(Arg) ->
-  Arg;
+  [];
 filter_bindings(List) when is_list(List) ->
   lists:sort([L || L <- List, is_atom(L)]).
 
