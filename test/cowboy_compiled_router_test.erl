@@ -28,6 +28,8 @@
 -host("[:optionaldomain].other.com").
   -get({"/", other_domain}).
 
+-get({"/api/[...]", poe_router_handler, [{app, <<"api">>}]}).
+
 -host("host1.com").
   -get({"/[...]", poe_router_handler, [{branch, <<"master">>}]}).
 

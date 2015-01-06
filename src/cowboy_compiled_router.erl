@@ -7,7 +7,7 @@ parse_transform(Forms, _Options) ->
   {ok, Patterns, [File, Module|Forms2]} = extract_patterns(Forms, [], [], '_'),
   {ok, Compiled} = compile(Patterns),
   {ok, Clauses} = to_clauses(Compiled, []),
-  {ok, Resolved} = to_resolve_clauses(Compiled, []),
+  {ok, Resolved} = to_resolve_clauses(Compiled, [], []),
   [_, Exports, MatchParts, Resolve, DefaultExtractAction|FunsRest] = template(),
   ExtractAction = case lists:keyfind(extract_action,3,Forms2) of
     false -> [DefaultExtractAction];
@@ -59,12 +59,15 @@ compile_path({Method, Host, {Path, Module, Args}, Line}) ->
     Acc ++ [{Method, HostParts, PathParts, Module, Args, Line} || {PathParts, [], noop, []} <- PathPatterns]
   end, [], cowboy_compiled_router_parser:parse(Routes)).
 
-to_resolve_clauses([], Clauses) ->
+unique_clauses(Clauses) ->
   Filtered = lists:foldl(fun({ID, Clause}, Acc) ->
     lists:keystore(ID, 1, Acc, {ID, Clause})
   end, [], Clauses),
-  {ok, [Clause || {_, Clause} <- lists:reverse(Filtered)]};
-to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
+  [Clause || {_, Clause} <- lists:reverse(Filtered)].
+
+to_resolve_clauses([], Clauses, Secondary) ->
+  {ok, unique_clauses(Clauses) ++ unique_clauses(Secondary)};
+to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc, SecondaryAcc) ->
   ResolvedMethod = case Method of
     '_' -> {atom,Line,'_'};
      _ -> to_bin(Method, Line)
@@ -98,7 +101,7 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
 
   case length(Fields) of
     0 ->
-      to_resolve_clauses(Rest, [MapClause,ListClause|Acc]);
+      to_resolve_clauses(Rest, [MapClause, ListClause|Acc], SecondaryAcc);
     _ ->
       ArgsList = to_args([Atom || Atom <- merge_lists(Host, Path), is_atom(Atom)], Line),
       Secondary = {erlang:phash2([ID, secondary]), {
@@ -108,7 +111,7 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
         [],
         [{call,Line,{atom,Line,resolve_error},[{atom,Line,Module},{var,Line,'Params'},ArgsList]}]
        }},
-      to_resolve_clauses(Rest, [Secondary, MapClause, ListClause|Acc])
+      to_resolve_clauses(Rest, [MapClause, ListClause|Acc], [Secondary|SecondaryAcc])
   end.
 
 filter_bindings(Arg) when is_atom(Arg) ->
