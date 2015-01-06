@@ -59,8 +59,12 @@ compile_path({Method, Host, {Path, Module, Args}, Line}) ->
     Acc ++ [{Method, HostParts, PathParts, Module, Args, Line} || {PathParts, [], noop, []} <- PathPatterns]
   end, [], cowboy_compiled_router_parser:parse(Routes)).
 
-to_resolve_clauses([], Acc) ->
-  {ok, lists:reverse(Acc)};
+to_resolve_clauses([], Clauses) ->
+  Filtered = lists:foldl(fun(Clause = {clause, _, [{atom,_,Module}|_], _, _}, Acc) ->
+    lists:keystore(Module, 1, Acc, {Module, Clause})
+  end, [], Clauses),
+  {ok, [Clause || {_, Clause} <- Filtered]};
+
 to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
   ResolvedMethod = case Method of
     '_' -> {atom,Line,'_'};
