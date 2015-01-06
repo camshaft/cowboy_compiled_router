@@ -28,6 +28,12 @@
 -host("[:optionaldomain].other.com").
   -get({"/", other_domain}).
 
+-host("host1.com").
+  -get({"/[...]", poe_router_handler, [{branch, <<"master">>}]}).
+
+-host("host2.com").
+  -get({"/[...]", poe_router_handler, [{branch, <<"staging">>}]}).
+
 extract_action(Req, Env) ->
   {foo, Req, Env}.
 

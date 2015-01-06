@@ -78,7 +78,7 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
       [{tuple,Line,[{atom,Line,ok},ResolvedMethod,resolve_binding(Host, '__HostInfo', Line),resolve_binding(Path, '__PathInfo', Line),Action]}]
   end,
 
-  ID = erlang:phash2([Module, Args]),
+  ID = erlang:phash2([Module, filter_bindings(Host), filter_bindings(Path)]),
 
   MapClause = {erlang:phash2([ID, map]), {
     clause,Line,
@@ -110,6 +110,11 @@ to_resolve_clauses([{Method, Host, Path, Module, Args, Line}|Rest], Acc) ->
        }},
       to_resolve_clauses(Rest, [Secondary, MapClause, ListClause|Acc])
   end.
+
+filter_bindings(Arg) when is_atom(Arg) ->
+  Arg;
+filter_bindings(List) when is_list(List) ->
+  lists:sort([L || L <- List, is_atom(L)]).
 
 resolve_binding(Part, Var, Line) ->
   case Part of
