@@ -137,6 +137,8 @@ to_fields([], _Line) ->
   [];
 to_fields(['...'|Rest], Line) ->
   to_fields(Rest, Line);
+to_fields(['_'|Rest], Line) ->
+  to_fields(Rest, Line);
 to_fields([Part|Rest], Line) when is_atom(Part) ->
   [{map_field_exact,Line,{atom,Line,Part},{var,10,Part}}|to_fields(Rest, Line)];
 to_fields([_|Rest], Line) ->
@@ -148,6 +150,8 @@ to_fields_list(Host, Path, Line) ->
 to_fields_list([], Line) ->
   {nil,Line};
 to_fields_list(['...'|Rest], Line) ->
+  to_fields_list(Rest, Line);
+to_fields_list(['_'|Rest], Line) ->
   to_fields_list(Rest, Line);
 to_fields_list([Part|Rest], Line) when is_atom(Part) ->
   {cons,Line,{var,Line,Part}, to_fields_list(Rest, Line)};
@@ -205,7 +209,7 @@ to_bindings(Host, Path, Line) ->
 
 to_bindings([], Line) ->
   {nil,Line};
-to_bindings(['...'|Rest], Line) ->
+to_bindings([Part|Rest], Line) when Part =:= '...' orelse Part =:= '_' ->
   to_bindings(Rest, Line);
 to_bindings([Part|Rest], Line) when is_atom(Part) ->
   {cons,Line,{tuple,Line,[{atom,Line,Part},{var,Line,Part}]}, to_bindings(Rest, Line)};
@@ -237,8 +241,8 @@ to_binding([Part|Rest], InfoVar, Line, Out) when is_list(Part) ->
   {cons,Line,to_bin(Part,Line),to_binding(Rest, InfoVar, Line, Out)};
 to_binding(['...'|_], InfoVar, Line, var) ->
   {var,Line,InfoVar};
-to_binding(['...'|Rest], InfoVar, Line, atom) ->
-  {cons,Line,{atom,Line,'...'},to_binding(Rest, InfoVar, Line, atom)};
+to_binding([Atom|Rest], InfoVar, Line, atom) when Atom =:= '...' orelse Atom =:= '_' ->
+  {cons,Line,{atom,Line,Atom},to_binding(Rest, InfoVar, Line, atom)};
 to_binding([Part|Rest], InfoVar, Line, Out) when is_atom(Part) ->
   {cons,Line,{var,Line,Part},to_binding(Rest, InfoVar, Line, Out)}.
 

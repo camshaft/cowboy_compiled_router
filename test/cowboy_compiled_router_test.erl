@@ -36,6 +36,8 @@
 -host("host2.com").
   -get({"/[...]", poe_router_handler, [{branch, <<"staging">>}]}).
 
+-host(":_.foobar.com").
+  -get({"/testing/[...]", other_handler, []}).
 
 extract_action(Req, Env) ->
   {foo, Req, Env}.
@@ -69,7 +71,9 @@ match_test_() ->
     {"GET", "foo.example.com", "/home/1/2/3",
      {ok, rest_resource, [], [{sub,<<"foo">>}], [], [<<"1">>,<<"2">>,<<"3">>]}},
     {"GET", "bar.other.com", "/",
-     {ok, other_domain, [], [{optionaldomain,<<"bar">>}], [], []}}
+     {ok, other_domain, [], [{optionaldomain,<<"bar">>}], [], []}},
+    {"GET", "testing.foobar.com", "/testing",
+     {ok, other_handler, [], [], [], []}}
   ],
   [{element(1,Test) ++ " " ++ element(2,Test) ++ element(3,Test), fun() ->
     case Test of
